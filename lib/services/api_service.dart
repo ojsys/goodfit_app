@@ -47,23 +47,16 @@ class ApiService {
     await prefs.remove(_tokenKey);
   }
 
-  Map<String, String> _getHeaders({bool useBearerFormat = true, bool includeAuth = true}) {
+  Map<String, String> _getHeaders({bool includeAuth = true}) {
     final headers = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
     
     if (includeAuth && _authToken != null) {
-      if (useBearerFormat) {
-        // Default: Bearer format (APIToken - backend expects this)
-        headers['Authorization'] = 'Bearer $_authToken';
-        AppLogger.info('Using Bearer format: Bearer ${_authToken?.substring(0, 10)}...', 'ApiService');
-      } else {
-        // Legacy: Token format (DRF TokenAuthentication - deprecated)
-        headers['Authorization'] = 'Token $_authToken';
-        AppLogger.info('Using Token format: Token ${_authToken?.substring(0, 10)}...', 'ApiService');
-      }
-      AppLogger.info('Full Authorization header: ${headers['Authorization']?.substring(0, 20)}...', 'ApiService');
+      // Use Bearer format (matches backend APIToken authentication)
+      headers['Authorization'] = 'Bearer $_authToken';
+      AppLogger.info('Using Bearer format: Bearer ${_authToken?.substring(0, 10)}...', 'ApiService');
     } else if (!includeAuth) {
       AppLogger.info('Skipping authorization header for this request', 'ApiService');
     } else {
@@ -71,6 +64,36 @@ class ApiService {
     }
     
     return headers;
+  }
+
+  // Helper method to handle paginated responses
+  List<T> _parsePaginatedResponse<T>(dynamic data, T Function(Map<String, dynamic>) fromJson) {
+    try {
+      if (data is Map<String, dynamic>) {
+        // Django REST Framework pagination format
+        if (data.containsKey('results') && data['results'] is List) {
+          return (data['results'] as List)
+              .map((item) => fromJson(item as Map<String, dynamic>))
+              .toList();
+        }
+        // Single item response
+        else if (data.containsKey('id')) {
+          return [fromJson(data)];
+        }
+      }
+      // Direct list response
+      else if (data is List) {
+        return data
+            .map((item) => fromJson(item as Map<String, dynamic>))
+            .toList();
+      }
+      
+      AppLogger.warning('Unexpected response format: $data', 'ApiService');
+      return [];
+    } catch (e) {
+      AppLogger.error('Error parsing paginated response: $e', 'ApiService');
+      return [];
+    }
   }
 
   bool get isAuthenticated => _authToken != null;
@@ -348,7 +371,7 @@ class ApiService {
         AppLogger.info('Testing $endpoint with Bearer format...', 'ApiService');
         final bearerResponse = await _client.get(
           Uri.parse('$_baseUrl$endpoint'),
-          headers: _getHeaders(useBearerFormat: true),
+          headers: _getHeaders(),
         ).timeout(const Duration(seconds: 10));
 
         AppLogger.info('$endpoint (Bearer): Status ${bearerResponse.statusCode}', 'ApiService');
@@ -364,7 +387,7 @@ class ApiService {
         AppLogger.info('Testing $endpoint with Token format (legacy)...', 'ApiService');
         final tokenResponse = await _client.get(
           Uri.parse('$_baseUrl$endpoint'),
-          headers: _getHeaders(useBearerFormat: false),
+          headers: _getHeaders(),
         ).timeout(const Duration(seconds: 10));
 
         AppLogger.info('$endpoint (Token): Status ${tokenResponse.statusCode}', 'ApiService');
@@ -1108,8 +1131,13 @@ class ApiService {
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final routes = List<Map<String, dynamic>>.from(data['results'] ?? data);
+        final routes = _parsePaginatedResponse(data, (json) => json);
         return ApiResponse.success(routes);
+      } else if (response.statusCode == 401) {
+        return ApiResponse.error('Authentication required');
+      } else if (response.statusCode == 404) {
+        // Endpoint doesn't exist yet
+        return ApiResponse.success([]);
       } else {
         return ApiResponse.error('Failed to get popular routes');
       }
@@ -1195,8 +1223,10 @@ class ApiService {
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final goals = List<Map<String, dynamic>>.from(data['results'] ?? data);
+        final goals = _parsePaginatedResponse(data, (json) => json);
         return ApiResponse.success(goals);
+      } else if (response.statusCode == 401) {
+        return ApiResponse.error('Authentication required');
       } else {
         return ApiResponse.error('Failed to get active goals');
       }
@@ -1262,8 +1292,13 @@ class ApiService {
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final achievements = List<Map<String, dynamic>>.from(data['results'] ?? data);
+        final achievements = _parsePaginatedResponse(data, (json) => json);
         return ApiResponse.success(achievements);
+      } else if (response.statusCode == 401) {
+        return ApiResponse.error('Authentication required');
+      } else if (response.statusCode == 404) {
+        // Endpoint doesn't exist yet
+        return ApiResponse.success([]);
       } else {
         return ApiResponse.error('Failed to get recent achievements');
       }
@@ -1285,8 +1320,10 @@ class ApiService {
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final records = List<Map<String, dynamic>>.from(data['results'] ?? data);
+        final records = _parsePaginatedResponse(data, (json) => json);
         return ApiResponse.success(records);
+      } else if (response.statusCode == 401) {
+        return ApiResponse.error('Authentication required');
       } else {
         return ApiResponse.error('Failed to get personal records');
       }

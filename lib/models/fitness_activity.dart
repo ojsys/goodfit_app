@@ -37,16 +37,21 @@ class FitnessActivity {
 
   factory FitnessActivity.fromJson(Map<String, dynamic> json) {
     return FitnessActivity(
-      id: json['id'],
-      activityType: json['activity_type'],
+      id: json['id'] ?? 0,
+      // Handle nested activity_type object or direct string
+      activityType: json['activity_type'] is Map 
+          ? json['activity_type']['name'] ?? json['activity_type']['slug'] ?? 'Unknown'
+          : (json['activity_type'] ?? 'Unknown'),
       name: json['name'],
-      durationMinutes: json['duration_minutes'],
-      distanceKm: json['distance_km']?.toDouble(),
-      caloriesBurned: json['calories_burned'],
+      // Handle duration - could be in different formats
+      durationMinutes: _parseDuration(json['duration']) ?? json['duration_minutes'] ?? 0,
+      distanceKm: json['distance_km']?.toDouble() ?? (json['distance'] != null ? (json['distance'] / 1000.0) : null),
+      caloriesBurned: json['calories'] ?? json['calories_burned'],
       startTime: DateTime.parse(json['start_time']),
       endTime: json['end_time'] != null ? DateTime.parse(json['end_time']) : null,
-      startLocation: json['start_location'],
-      endLocation: json['end_location'],
+      // Handle location fields - backend uses different names
+      startLocation: json['start_location'] ?? json['start_location_name'],
+      endLocation: json['end_location'] ?? json['end_location_name'],
       startLatitude: json['start_latitude']?.toDouble(),
       startLongitude: json['start_longitude']?.toDouble(),
       endLatitude: json['end_latitude']?.toDouble(),
@@ -54,6 +59,23 @@ class FitnessActivity {
       routeData: json['route_data'],
       isCompleted: json['is_completed'] ?? true,
     );
+  }
+
+  // Helper method to parse duration from Django format
+  static int? _parseDuration(dynamic duration) {
+    if (duration == null) return null;
+    if (duration is int) return duration;
+    if (duration is String) {
+      // Django TimeDelta format: "01:30:00" or similar
+      final parts = duration.split(':');
+      if (parts.length >= 3) {
+        final hours = int.tryParse(parts[0]) ?? 0;
+        final minutes = int.tryParse(parts[1]) ?? 0;
+        final seconds = int.tryParse(parts[2].split('.')[0]) ?? 0;
+        return (hours * 60) + minutes + (seconds > 30 ? 1 : 0); // Round seconds to minutes
+      }
+    }
+    return null;
   }
 
   Map<String, dynamic> toJson() {
