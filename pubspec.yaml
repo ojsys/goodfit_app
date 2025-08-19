@@ -43,6 +43,9 @@ dependencies:
   provider: ^6.1.1             # For state management
   google_fonts: ^6.1.0         # For custom fonts like Poly
   path_provider: ^2.1.1        # For Google Fonts file system access
+  location: ^5.0.3             # For location services
+  geocoding: ^3.0.0            # For address geocoding
+  geolocator: ^10.1.0          # For location tracking
 
 dev_dependencies:
   flutter_test:

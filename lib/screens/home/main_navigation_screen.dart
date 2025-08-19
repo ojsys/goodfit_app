@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/common/unified_create_modal.dart';
 import 'home_tab.dart';
+import '../routes/routes_discovery_screen.dart';
+import '../goals/goals_screen.dart';
+import '../social/community_screen.dart';
 import '../map/workout_map_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
@@ -15,8 +19,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   final List<Widget> _screens = [
     const HomeTab(),
-    const MapTab(),
-    const EventsTab(),
+    const RoutesDiscoveryScreen(),
+    const GoalsScreen(),
+    const CommunityScreen(),
     const ProfileTab(),
   ];
 
@@ -24,33 +29,83 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _screens[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
-        selectedItemColor: AppTheme.primaryColor,
-        unselectedItemColor: Colors.grey,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showUnifiedCreateModal,
+        backgroundColor: AppTheme.primaryColor,
+        child: const Icon(Icons.add, color: Colors.white, size: 28),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                Expanded(child: _buildBottomNavItem(Icons.home, 'Home', 0)),
+                Expanded(child: _buildBottomNavItem(Icons.route, 'Routes', 1)),
+                Expanded(child: _buildBottomNavItem(Icons.flag, 'Goals', 2)),
+                Expanded(child: _buildBottomNavItem(Icons.people, 'Social', 3)),
+                Expanded(child: _buildBottomNavItem(Icons.person, 'Profile', 4)),
+              ],
+            ),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.map),
-            label: 'Map',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.event),
-            label: 'Events',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
+        ),
       ),
     );
   }
+
+  Widget _buildBottomNavItem(IconData icon, String label, int index) {
+    final isSelected = _currentIndex == index;
+    return GestureDetector(
+      onTap: () => setState(() => _currentIndex = index),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? AppTheme.primaryColor : Colors.grey,
+              size: 24,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? AppTheme.primaryColor : Colors.grey,
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showUnifiedCreateModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const UnifiedCreateModal(),
+    );
+  }
+
 }
 
 class MapTab extends StatelessWidget {
@@ -97,6 +152,7 @@ class ProfileTab extends StatelessWidget {
         title: const Text('Profile'),
         backgroundColor: Colors.white,
         elevation: 0,
+        automaticallyImplyLeading: false,
       ),
       body: const Center(
         child: Text(

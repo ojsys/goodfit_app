@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -12,12 +14,29 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    // Auto-redirect to welcome screen after 5 seconds
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, '/welcome');
-      }
-    });
+    _checkAuthenticationStatus();
+  }
+
+  Future<void> _checkAuthenticationStatus() async {
+    // Wait for splash screen display (2 seconds minimum)
+    await Future.delayed(const Duration(seconds: 2));
+    
+    if (!mounted) return;
+    
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    // Test connection first
+    await authProvider.testConnection();
+    
+    if (!mounted) return;
+    
+    if (authProvider.isAuthenticated && authProvider.user != null) {
+      // User is logged in, go to home
+      Navigator.pushReplacementNamed(context, '/home');
+    } else {
+      // User not logged in, go to welcome screen
+      Navigator.pushReplacementNamed(context, '/welcome');
+    }
   }
 
   @override
