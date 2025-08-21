@@ -19,6 +19,7 @@ import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/onboarding/activity_preferences_screen.dart';
 import 'screens/onboarding/photo_upload_screen.dart';
 import 'screens/home/main_navigation_screen.dart';
+import 'screens/profile/edit_profile_screen.dart';
 import 'screens/map/workout_map_screen.dart';
 
 void main() async {
@@ -75,6 +76,7 @@ class AGoodFitApp extends StatelessWidget {
           '/activity-preferences': (context) => const ActivityPreferencesScreen(),
           '/photo-upload': (context) => const PhotoUploadScreen(),
           '/home': (context) => const MainNavigationScreen(),
+          '/edit-profile': (context) => const EditProfileScreen(),
           '/map': (context) => const WorkoutMapScreen(),
         },
       ),

@@ -10,7 +10,7 @@ import '../models/fitness_activity.dart';
 import '../utils/logger.dart';
 
 class ApiService {
-  static const String _baseUrl = 'http://194.195.86.92:8000/api/v1';
+  static const String _baseUrl = 'http://127.0.0.1:8001/api/v1';
   static const String _tokenKey = 'auth_token';
   
   String? _authToken;
@@ -64,6 +64,34 @@ class ApiService {
     }
     
     return headers;
+  }
+
+  int _mapActivityTypeToId(String activityType) {
+    // Map activity type names to IDs based on backend data
+    switch (activityType.toLowerCase()) {
+      case 'running':
+        return 1;
+      case 'walking':
+        return 2;
+      case 'cycling':
+        return 3;
+      case 'swimming':
+        return 4;
+      case 'yoga':
+        return 5;
+      case 'strength training':
+        return 6;
+      case 'hiit':
+        return 7;
+      case 'dance':
+        return 8;
+      case 'tennis':
+        return 9;
+      case 'basketball':
+        return 10;
+      default:
+        return 1; // Default to running
+    }
   }
 
   // Helper method to handle paginated responses
@@ -597,21 +625,34 @@ class ApiService {
     double? endLongitude,
   }) async {
     try {
+      // Map activity type name to ID
+      final activityTypeId = _mapActivityTypeToId(activityType);
+      
+      // Format duration as HH:MM:SS
+      final hours = durationMinutes ~/ 60;
+      final minutes = durationMinutes % 60;
+      final durationString = '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:00';
+      
+      // Convert distance from km to meters
+      final distanceMeters = (distanceKm ?? 0.0) * 1000;
+      
+      // Generate start time (use current time for now)
+      final startTime = DateTime.now().toUtc().toIso8601String();
+      
       final response = await _client.post(
         Uri.parse('$_baseUrl/fitness/activities/'),
         headers: _getHeaders(),
         body: jsonEncode({
-          'activity_type': activityType,
-          'duration_minutes': durationMinutes,
-          'distance_km': distanceKm,
-          'calories_burned': caloriesBurned,
-          if (activityName != null) 'name': activityName,
-          if (startLocation != null) 'start_location': startLocation,
-          if (endLocation != null) 'end_location': endLocation,
-          if (startLatitude != null) 'start_latitude': startLatitude,
-          if (startLongitude != null) 'start_longitude': startLongitude,
-          if (endLatitude != null) 'end_latitude': endLatitude,
-          if (endLongitude != null) 'end_longitude': endLongitude,
+          'activity_type_id': activityTypeId,
+          'name': activityName ?? 'Activity',
+          'start_time': startTime,
+          'duration': durationString,
+          'moving_time': durationString, // Assume same as total duration for simplicity
+          'distance': distanceMeters,
+          if (caloriesBurned != null) 'calories': caloriesBurned,
+          'privacy': 'public',
+          if (startLatitude != null) 'start_latitude': startLatitude.toString(),
+          if (startLongitude != null) 'start_longitude': startLongitude.toString(),
         }),
       );
 
@@ -652,20 +693,28 @@ class ApiService {
   }
 
   Future<ApiResponse<UserProfile>> updateProfile({
+    String? firstName,
+    String? lastName,
     String? bio,
     DateTime? birthDate,
     String? gender,
     List<String>? interests,
+    String? datingIntentions,
+    String? phoneNumber,
   }) async {
     try {
       final response = await _client.patch(
         Uri.parse('$_baseUrl/auth/profile/'),
         headers: _getHeaders(),
         body: jsonEncode({
+          if (firstName != null) 'first_name': firstName,
+          if (lastName != null) 'last_name': lastName,
           if (bio != null) 'bio': bio,
-          if (birthDate != null) 'birth_date': birthDate.toIso8601String(),
+          if (birthDate != null) 'birth_date': birthDate.toIso8601String().split('T')[0],
           if (gender != null) 'gender': gender,
           if (interests != null) 'interests': interests,
+          if (datingIntentions != null) 'dating_intentions': datingIntentions,
+          if (phoneNumber != null) 'phone_number': phoneNumber,
         }),
       );
 
@@ -679,6 +728,149 @@ class ApiService {
       }
     } catch (e) {
       AppLogger.error('Error updating profile', 'ApiService', e);
+      return ApiResponse.error('Network error: $e');
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> updateFitnessProfile({
+    String? activityLevel,
+    List<String>? fitnessGoals,
+    List<String>? favoriteActivities,
+    int? workoutFrequency,
+    String? preferredWorkoutTime,
+    String? gymMembership,
+    String? injuriesLimitations,
+  }) async {
+    try {
+      final response = await _client.patch(
+        Uri.parse('$_baseUrl/auth/fitness-profile/'),
+        headers: _getHeaders(),
+        body: jsonEncode({
+          if (activityLevel != null) 'activity_level': activityLevel,
+          if (fitnessGoals != null) 'fitness_goals': fitnessGoals,
+          if (favoriteActivities != null) 'favorite_activities': favoriteActivities,
+          if (workoutFrequency != null) 'workout_frequency': workoutFrequency,
+          if (preferredWorkoutTime != null) 'preferred_workout_time': preferredWorkoutTime,
+          if (gymMembership != null) 'gym_membership': gymMembership,
+          if (injuriesLimitations != null) 'injuries_limitations': injuriesLimitations,
+        }),
+      );
+
+      AppLogger.network('/auth/fitness-profile/', response.statusCode, 'UPDATE');
+      final data = jsonDecode(response.body);
+      
+      if (response.statusCode == 200) {
+        return ApiResponse.success(data);
+      } else {
+        return ApiResponse.error(data['message'] ?? 'Failed to update fitness profile');
+      }
+    } catch (e) {
+      AppLogger.error('Error updating fitness profile', 'ApiService', e);
+      return ApiResponse.error('Network error: $e');
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> updatePrivacySettings({
+    bool? showProfilePublicly,
+    bool? showFitnessData,
+    bool? showLocation,
+    bool? showOnlineStatus,
+    bool? allowMessagesFromStrangers,
+    bool? showInDiscovery,
+    bool? shareWorkoutData,
+    bool? showAge,
+    bool? showDistance,
+  }) async {
+    try {
+      final response = await _client.patch(
+        Uri.parse('$_baseUrl/auth/privacy-settings/'),
+        headers: _getHeaders(),
+        body: jsonEncode({
+          if (showProfilePublicly != null) 'show_profile_publicly': showProfilePublicly,
+          if (showFitnessData != null) 'show_fitness_data': showFitnessData,
+          if (showLocation != null) 'show_location': showLocation,
+          if (showOnlineStatus != null) 'show_online_status': showOnlineStatus,
+          if (allowMessagesFromStrangers != null) 'allow_messages_from_strangers': allowMessagesFromStrangers,
+          if (showInDiscovery != null) 'show_in_discovery': showInDiscovery,
+          if (shareWorkoutData != null) 'share_workout_data': shareWorkoutData,
+          if (showAge != null) 'show_age': showAge,
+          if (showDistance != null) 'show_distance': showDistance,
+        }),
+      );
+
+      AppLogger.network('/auth/privacy-settings/', response.statusCode, 'UPDATE');
+      final data = jsonDecode(response.body);
+      
+      if (response.statusCode == 200) {
+        return ApiResponse.success(data);
+      } else {
+        return ApiResponse.error(data['message'] ?? 'Failed to update privacy settings');
+      }
+    } catch (e) {
+      AppLogger.error('Error updating privacy settings', 'ApiService', e);
+      return ApiResponse.error('Network error: $e');
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> updateBasicProfile({
+    String? firstName,
+    String? lastName,
+  }) async {
+    try {
+      final response = await _client.patch(
+        Uri.parse('$_baseUrl/auth/me/'),
+        headers: _getHeaders(),
+        body: jsonEncode({
+          if (firstName != null) 'first_name': firstName,
+          if (lastName != null) 'last_name': lastName,
+        }),
+      );
+
+      AppLogger.network('/auth/me/', response.statusCode, 'UPDATE');
+      final data = jsonDecode(response.body);
+      
+      if (response.statusCode == 200) {
+        return ApiResponse.success(data);
+      } else {
+        return ApiResponse.error(data['message'] ?? 'Failed to update basic profile');
+      }
+    } catch (e) {
+      AppLogger.error('Error updating basic profile', 'ApiService', e);
+      return ApiResponse.error('Network error: $e');
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> uploadProfileImage(File imageFile) async {
+    try {
+      var request = http.MultipartRequest(
+        'PATCH',
+        Uri.parse('$_baseUrl/auth/profile/'),
+      );
+      
+      // Add headers
+      request.headers.addAll(_getHeaders());
+      
+      // Add the image file
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'profile_picture',
+          imageFile.path,
+        ),
+      );
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      AppLogger.network('/auth/profile/', response.statusCode, 'UPLOAD');
+      final data = jsonDecode(response.body);
+      
+      if (response.statusCode == 200) {
+        return ApiResponse.success(data);
+      } else {
+        return ApiResponse.error(data['message'] ?? 'Failed to upload profile image');
+      }
+    } catch (e) {
+      AppLogger.error('Error uploading profile image', 'ApiService', e);
       return ApiResponse.error('Network error: $e');
     }
   }
@@ -1470,6 +1662,105 @@ class ApiService {
       }
     } catch (e) {
       AppLogger.error('Error connecting Strava', 'ApiService', e);
+      return ApiResponse.error('Network error: $e');
+    }
+  }
+
+  // Generic HTTP methods for live activity service
+  Future<ApiResponse<Map<String, dynamic>>> get(String endpoint) async {
+    try {
+      final response = await _client.get(
+        Uri.parse('$_baseUrl$endpoint'),
+        headers: _getHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return ApiResponse.success(data is Map<String, dynamic> ? data : {'data': data});
+      } else {
+        return ApiResponse.error('HTTP ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      AppLogger.error('GET $endpoint error', 'ApiService', e);
+      return ApiResponse.error('Network error: $e');
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> post(String endpoint, Map<String, dynamic> data) async {
+    try {
+      final response = await _client.post(
+        Uri.parse('$_baseUrl$endpoint'),
+        headers: _getHeaders(),
+        body: json.encode(data),
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final responseData = json.decode(response.body);
+        return ApiResponse.success(responseData is Map<String, dynamic> ? responseData : {'data': responseData});
+      } else {
+        return ApiResponse.error('HTTP ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      AppLogger.error('POST $endpoint error', 'ApiService', e);
+      return ApiResponse.error('Network error: $e');
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> patch(String endpoint, Map<String, dynamic> data) async {
+    try {
+      final response = await _client.patch(
+        Uri.parse('$_baseUrl$endpoint'),
+        headers: _getHeaders(),
+        body: json.encode(data),
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final responseData = json.decode(response.body);
+        return ApiResponse.success(responseData is Map<String, dynamic> ? responseData : {'data': responseData});
+      } else {
+        return ApiResponse.error('HTTP ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      AppLogger.error('PATCH $endpoint error', 'ApiService', e);
+      return ApiResponse.error('Network error: $e');
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> put(String endpoint, Map<String, dynamic> data) async {
+    try {
+      final response = await _client.put(
+        Uri.parse('$_baseUrl$endpoint'),
+        headers: _getHeaders(),
+        body: json.encode(data),
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final responseData = json.decode(response.body);
+        return ApiResponse.success(responseData is Map<String, dynamic> ? responseData : {'data': responseData});
+      } else {
+        return ApiResponse.error('HTTP ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      AppLogger.error('PUT $endpoint error', 'ApiService', e);
+      return ApiResponse.error('Network error: $e');
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> delete(String endpoint) async {
+    try {
+      final response = await _client.delete(
+        Uri.parse('$_baseUrl$endpoint'),
+        headers: _getHeaders(),
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final responseData = response.body.isNotEmpty ? json.decode(response.body) : {};
+        return ApiResponse.success(responseData is Map<String, dynamic> ? responseData : {'data': responseData});
+      } else {
+        return ApiResponse.error('HTTP ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      AppLogger.error('DELETE $endpoint error', 'ApiService', e);
       return ApiResponse.error('Network error: $e');
     }
   }

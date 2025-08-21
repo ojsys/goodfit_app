@@ -3,6 +3,7 @@ import 'package:flutter/scheduler.dart';
 import '../services/api_service.dart';
 import '../services/local_storage_service.dart';
 import '../models/fitness_activity.dart';
+import '../models/user.dart';
 import '../utils/logger.dart';
 import '../utils/distance_calculator.dart';
 
@@ -12,10 +13,12 @@ class FitnessProvider with ChangeNotifier {
   List<FitnessActivity> _activities = [];
   bool _isLoading = false;
   String? _errorMessage;
+  User? _currentUser;
 
   List<FitnessActivity> get activities => _activities;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  User? get currentUser => _currentUser;
 
   // Today's stats computed from activities
   int get todaysSteps => _calculateTodaysSteps();
@@ -219,6 +222,23 @@ class FitnessProvider with ChangeNotifier {
     // This would come from heart rate data in a real app
     // For now, return a demo value
     return 75;
+  }
+
+  void setCurrentUser(User? user) {
+    if (_currentUser?.id != user?.id) {
+      _currentUser = user;
+      // Clear activities when user changes to ensure fresh data
+      if (user == null) {
+        _activities = [];
+        AppLogger.info('User logged out, cleared activities', 'FitnessProvider');
+      } else {
+        AppLogger.info('User changed, will reload activities for user: ${user.email}', 'FitnessProvider');
+      }
+      
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
+    }
   }
 
   void clearError() {

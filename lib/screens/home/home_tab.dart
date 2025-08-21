@@ -34,11 +34,16 @@ class _HomeTabState extends State<HomeTab> {
 
   Future<void> _initializeData() async {
     // Initialize all providers with data
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final fitnessProvider = Provider.of<FitnessProvider>(context, listen: false);
     final goalsProvider = Provider.of<GoalsProvider>(context, listen: false);
     final routesProvider = Provider.of<RoutesProvider>(context, listen: false);
     final achievementsProvider = Provider.of<AchievementsProvider>(context, listen: false);
     final recordsProvider = Provider.of<PersonalRecordsProvider>(context, listen: false);
+    
+    // Set current user in providers for user-specific filtering
+    fitnessProvider.setCurrentUser(authProvider.user);
+    goalsProvider.setCurrentUser(authProvider.user);
     
     await Future.wait([
       fitnessProvider.loadActivities(),
@@ -74,40 +79,52 @@ class _HomeTabState extends State<HomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      body: RefreshIndicator(
-        onRefresh: _initializeData,
-        child: CustomScrollView(
-          slivers: [
-            _buildAppBar(),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const QuickActionsSection(),
-                    const SizedBox(height: 24),
-                    const FitnessOverviewSection(),
-                    const SizedBox(height: 24),
-                    const TodaysActivitiesSection(),
-                    const SizedBox(height: 24),
-                    const GoalsPreviewSection(),
-                    const SizedBox(height: 24),
-                    const RoutesPreviewSection(),
-                    const SizedBox(height: 24),
-                    const WorkoutMatchesSection(),
-                    const SizedBox(height: 24),
-                    const SocialFeedSection(),
-                    const SizedBox(height: 100), // Space for FAB
-                  ],
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, child) {
+        // Update providers when auth state changes
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final fitnessProvider = Provider.of<FitnessProvider>(context, listen: false);
+          final goalsProvider = Provider.of<GoalsProvider>(context, listen: false);
+          fitnessProvider.setCurrentUser(authProvider.user);
+          goalsProvider.setCurrentUser(authProvider.user);
+        });
+
+        return Scaffold(
+          backgroundColor: Colors.grey.shade50,
+          body: RefreshIndicator(
+            onRefresh: _initializeData,
+            child: CustomScrollView(
+              slivers: [
+                _buildAppBar(),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const QuickActionsSection(),
+                        const SizedBox(height: 24),
+                        const FitnessOverviewSection(),
+                        const SizedBox(height: 24),
+                        const TodaysActivitiesSection(),
+                        const SizedBox(height: 24),
+                        const GoalsPreviewSection(),
+                        const SizedBox(height: 24),
+                        const RoutesPreviewSection(),
+                        const SizedBox(height: 24),
+                        const WorkoutMatchesSection(),
+                        const SizedBox(height: 24),
+                        const SocialFeedSection(),
+                        const SizedBox(height: 100), // Space for FAB
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 

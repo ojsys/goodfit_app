@@ -15,6 +15,16 @@ class FitnessActivity {
   final double? endLongitude;
   final String? routeData;
   final bool isCompleted;
+  
+  // Goal linking fields
+  final List<int> linkedGoalIds;
+  
+  // Live tracking fields
+  final bool isLiveTracked;
+  final String trackingStatus; // 'not_started', 'in_progress', 'paused', 'completed'
+  final DateTime? trackingStartedAt;
+  final List<Map<String, dynamic>>? liveCoordinates; // [[lat, lng, timestamp], ...]
+  final Map<String, dynamic>? liveMetrics; // real-time distance, pace, speed, etc.
 
   FitnessActivity({
     required this.id,
@@ -33,6 +43,12 @@ class FitnessActivity {
     this.endLongitude,
     this.routeData,
     this.isCompleted = true,
+    this.linkedGoalIds = const [],
+    this.isLiveTracked = false,
+    this.trackingStatus = 'not_started',
+    this.trackingStartedAt,
+    this.liveCoordinates,
+    this.liveMetrics,
   });
 
   factory FitnessActivity.fromJson(Map<String, dynamic> json) {
@@ -58,6 +74,20 @@ class FitnessActivity {
       endLongitude: json['end_longitude']?.toDouble(),
       routeData: json['route_data'],
       isCompleted: json['is_completed'] ?? true,
+      
+      // Goal linking fields
+      linkedGoalIds: _parseLinkedGoalIds(json['linked_goal_ids']),
+      
+      // Live tracking fields
+      isLiveTracked: json['is_live_tracked'] ?? false,
+      trackingStatus: json['tracking_status'] ?? 'not_started',
+      trackingStartedAt: json['tracking_started_at'] != null 
+          ? DateTime.parse(json['tracking_started_at']) 
+          : null,
+      liveCoordinates: _parseLiveCoordinates(json['live_coordinates']),
+      liveMetrics: json['live_metrics'] is Map<String, dynamic> 
+          ? Map<String, dynamic>.from(json['live_metrics']) 
+          : null,
     );
   }
 
@@ -74,6 +104,33 @@ class FitnessActivity {
         final seconds = int.tryParse(parts[2].split('.')[0]) ?? 0;
         return (hours * 60) + minutes + (seconds > 30 ? 1 : 0); // Round seconds to minutes
       }
+    }
+    return null;
+  }
+
+  // Helper method to parse linked goal IDs
+  static List<int> _parseLinkedGoalIds(dynamic goalIds) {
+    if (goalIds == null) return [];
+    if (goalIds is List) {
+      return goalIds.map<int>((id) => int.tryParse(id.toString()) ?? 0).toList();
+    }
+    return [];
+  }
+
+  // Helper method to parse live coordinates
+  static List<Map<String, dynamic>>? _parseLiveCoordinates(dynamic coordinates) {
+    if (coordinates == null) return null;
+    if (coordinates is List) {
+      return coordinates.map<Map<String, dynamic>>((coord) {
+        if (coord is List && coord.length >= 3) {
+          return {
+            'lat': coord[0]?.toDouble() ?? 0.0,
+            'lng': coord[1]?.toDouble() ?? 0.0,
+            'timestamp': coord[2]?.toString() ?? '',
+          };
+        }
+        return {'lat': 0.0, 'lng': 0.0, 'timestamp': ''};
+      }).toList();
     }
     return null;
   }
@@ -96,6 +153,16 @@ class FitnessActivity {
       'end_longitude': endLongitude,
       'route_data': routeData,
       'is_completed': isCompleted,
+      
+      // Goal linking fields
+      'linked_goal_ids': linkedGoalIds,
+      
+      // Live tracking fields
+      'is_live_tracked': isLiveTracked,
+      'tracking_status': trackingStatus,
+      'tracking_started_at': trackingStartedAt?.toIso8601String(),
+      'live_coordinates': liveCoordinates,
+      'live_metrics': liveMetrics,
     };
   }
 
@@ -118,5 +185,50 @@ class FitnessActivity {
       final minutes = durationMinutes % 60;
       return minutes > 0 ? '${hours}h ${minutes}m' : '${hours}h';
     }
+  }
+  
+  // Goal-related helper methods
+  bool get hasLinkedGoals => linkedGoalIds.isNotEmpty;
+  
+  bool isLinkedToGoal(int goalId) => linkedGoalIds.contains(goalId);
+  
+  // Live tracking helper methods
+  bool get isCurrentlyTracking => isLiveTracked && trackingStatus == 'in_progress';
+  
+  bool get isTrackingPaused => isLiveTracked && trackingStatus == 'paused';
+  
+  bool get isTrackingCompleted => trackingStatus == 'completed';
+  
+  // Get current live distance in km
+  double? get currentLiveDistance {
+    if (liveMetrics != null && liveMetrics!.containsKey('distance')) {
+      return liveMetrics!['distance']?.toDouble();
+    }
+    return null;
+  }
+  
+  // Get current live pace (minutes per km)
+  double? get currentLivePace {
+    if (liveMetrics != null && liveMetrics!.containsKey('pace')) {
+      return liveMetrics!['pace']?.toDouble();
+    }
+    return null;
+  }
+  
+  // Get current live speed (km/h)
+  double? get currentLiveSpeed {
+    if (liveMetrics != null && liveMetrics!.containsKey('speed')) {
+      return liveMetrics!['speed']?.toDouble();
+    }
+    return null;
+  }
+  
+  // Get tracking duration in minutes
+  int get trackingDurationMinutes {
+    if (trackingStartedAt != null) {
+      final now = DateTime.now();
+      return now.difference(trackingStartedAt!).inMinutes;
+    }
+    return 0;
   }
 }

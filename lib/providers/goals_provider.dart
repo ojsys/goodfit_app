@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import '../models/fitness_goal.dart';
+import '../models/user.dart';
 import '../services/api_service.dart';
 import '../utils/logger.dart';
 
@@ -12,6 +13,7 @@ class GoalsProvider with ChangeNotifier {
   List<FitnessGoal> _activeGoals = [];
   bool _isLoading = false;
   String? _error;
+  User? _currentUser;
 
   GoalsProvider({required ApiService apiService}) : _apiService = apiService;
 
@@ -19,6 +21,7 @@ class GoalsProvider with ChangeNotifier {
   List<FitnessGoal> get activeGoals => _activeGoals;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  User? get currentUser => _currentUser;
 
   List<FitnessGoal> get completedGoals => 
       _goals.where((goal) => goal.isCompleted).toList();
@@ -145,6 +148,24 @@ class GoalsProvider with ChangeNotifier {
         0.0, (sum, goal) => sum + goal.progressPercentage);
     
     return totalProgress / _activeGoals.length;
+  }
+
+  void setCurrentUser(User? user) {
+    if (_currentUser?.id != user?.id) {
+      _currentUser = user;
+      // Clear goals when user changes to ensure fresh data
+      if (user == null) {
+        _goals = [];
+        _activeGoals = [];
+        AppLogger.info('User logged out, cleared goals', _logTag);
+      } else {
+        AppLogger.info('User changed, will reload goals for user: ${user.email}', _logTag);
+      }
+      
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
+    }
   }
 
   void clearError() {

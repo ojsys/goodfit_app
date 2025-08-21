@@ -45,7 +45,22 @@ dependencies:
   path_provider: ^2.1.1        # For Google Fonts file system access
   location: ^5.0.3             # For location services
   geocoding: ^3.0.0            # For address geocoding
-  geolocator: ^10.1.0          # For location tracking
+  geolocator: ^10.1.0          # For location tracking and distance calculations
+  
+  # Enhanced location and mapping for live tracking
+  flutter_polyline_points: ^2.0.0  # For polyline encoding/decoding
+  flutter_background_service: ^5.0.5  # For background GPS tracking
+  permission_handler: ^11.0.1  # Enhanced permission management
+  
+  # Real-time calculations
+  vector_math: ^2.1.4          # For distance calculations
+  
+  # Audio feedback for live tracking
+  flutter_tts: ^4.0.2          # Text-to-speech for audio cues
+  audioplayers: ^6.0.0         # For milestone sounds
+  
+  # Performance optimization
+  flutter_isolate: ^2.0.4      # For background processing
 
 dev_dependencies:
   flutter_test:

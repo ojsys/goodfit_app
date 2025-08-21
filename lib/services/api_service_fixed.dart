@@ -10,7 +10,7 @@ import '../models/fitness_activity.dart';
 import '../utils/logger.dart';
 
 class ApiService {
-  static const String _baseUrl = 'http://194.195.86.92:8000/api/v1';
+  static const String _baseUrl = 'http://127.0.0.1:8001/api/v1';
   static const String _tokenKey = 'auth_token';
   
   String? _authToken;

@@ -31,21 +31,21 @@ class FitnessGoal {
 
   factory FitnessGoal.fromJson(Map<String, dynamic> json) {
     return FitnessGoal(
-      id: json['id'],
-      title: json['title'],
-      description: json['description'],
-      goalType: json['goal_type'],
+      id: json['id'] ?? 0,
+      title: json['title']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      goalType: json['goal_type']?.toString() ?? 'distance',
       targetValue: json['target_value']?.toDouble() ?? 0.0,
-      unit: json['unit'],
-      startDate: DateTime.parse(json['start_date']),
-      endDate: DateTime.parse(json['end_date']),
+      unit: json['unit']?.toString() ?? '',
+      startDate: DateTime.parse(json['start_date']?.toString() ?? DateTime.now().toIso8601String()),
+      endDate: DateTime.parse(json['end_date']?.toString() ?? DateTime.now().add(const Duration(days: 30)).toIso8601String()),
       currentProgress: json['current_progress']?.toDouble() ?? 0.0,
       isActive: json['is_active'] ?? false,
       isCompleted: json['is_completed'] ?? false,
       completedDate: json['completed_date'] != null 
-          ? DateTime.parse(json['completed_date']) 
+          ? DateTime.parse(json['completed_date'].toString()) 
           : null,
-      activityType: json['activity_type'],
+      activityType: json['activity_type']?.toString(),
     );
   }
 

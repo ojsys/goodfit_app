@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   static const Color primaryColor = Color(0xFF8B9A47);
   static const Color backgroundColor = Color(0xFFF5F3F0);
-  static const String fontFamily = 'Georgia';
+  static const String fontFamily = 'Poppins';
 
   static MaterialColor get primarySwatch => MaterialColor(
         0xFF8B9A47,
@@ -24,11 +25,16 @@ class AppTheme {
   static ThemeData get theme => ThemeData(
         primarySwatch: primarySwatch,
         scaffoldBackgroundColor: backgroundColor,
-        fontFamily: fontFamily,
+        textTheme: GoogleFonts.poppinsTextTheme(),
+        fontFamily: GoogleFonts.poppins().fontFamily,
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             backgroundColor: primaryColor,
             foregroundColor: Colors.white,
+            textStyle: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -39,6 +45,10 @@ class AppTheme {
           style: OutlinedButton.styleFrom(
             side: const BorderSide(color: primaryColor),
             foregroundColor: primaryColor,
+            textStyle: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
@@ -60,6 +70,12 @@ class AppTheme {
           ),
           filled: true,
           fillColor: Colors.white,
+          labelStyle: GoogleFonts.poppins(
+            color: Colors.grey.shade600,
+          ),
+          hintStyle: GoogleFonts.poppins(
+            color: Colors.grey.shade500,
+          ),
         ),
       );
 }

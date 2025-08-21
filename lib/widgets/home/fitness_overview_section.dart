@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/fitness_provider.dart';
 import '../../providers/goals_provider.dart';
 import '../../providers/achievements_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 
 class FitnessOverviewSection extends StatelessWidget {
@@ -10,11 +11,12 @@ class FitnessOverviewSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer3<FitnessProvider, GoalsProvider, AchievementsProvider>(
-      builder: (context, fitnessProvider, goalsProvider, achievementsProvider, child) {
+    return Consumer4<FitnessProvider, GoalsProvider, AchievementsProvider, AuthProvider>(
+      builder: (context, fitnessProvider, goalsProvider, achievementsProvider, authProvider, child) {
         final todaysActivities = fitnessProvider.todaysActivities;
         final activeGoals = goalsProvider.activeGoals;
         final totalPoints = achievementsProvider.totalPoints;
+        final user = authProvider.user;
         
         // Calculate today's stats
         final todaysDistance = todaysActivities.fold<double>(
@@ -66,9 +68,11 @@ class FitnessOverviewSection extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    const Text(
-                      'Today\'s Overview',
-                      style: TextStyle(
+                    Text(
+                      user != null 
+                        ? '${user.firstName}\'s Today' 
+                        : 'Today\'s Overview',
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
@@ -105,7 +109,7 @@ class FitnessOverviewSection extends StatelessWidget {
                     Expanded(
                       child: _buildStatCard(
                         'Duration',
-                        '${todaysDuration} min',
+                        '$todaysDuration min',
                         Icons.timer,
                         Colors.orange,
                       ),
@@ -114,7 +118,7 @@ class FitnessOverviewSection extends StatelessWidget {
                     Expanded(
                       child: _buildStatCard(
                         'Calories',
-                        '${todaysCalories} cal',
+                        '$todaysCalories cal',
                         Icons.local_fire_department,
                         Colors.red,
                       ),
