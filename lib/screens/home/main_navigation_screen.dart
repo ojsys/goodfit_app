@@ -516,7 +516,7 @@ class ProfileTab extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    userProfile!.bio!,
+                    userProfile?.bio ?? '',
                     style: const TextStyle(
                       fontSize: 16,
                       height: 1.5,
@@ -568,13 +568,13 @@ class ProfileTab extends StatelessWidget {
                   if (userProfile?.birthDate != null)
                     _buildDetailItem(
                       'Age',
-                      '${DateTime.now().year - userProfile!.birthDate!.year} years old',
+                      '${DateTime.now().year - (userProfile?.birthDate?.year ?? DateTime.now().year)} years old',
                       Icons.cake_outlined,
                     ),
                   if (userProfile?.gender != null)
                     _buildDetailItem(
                       'Gender',
-                      _getGenderDisplay(userProfile!.gender!),
+                      _getGenderDisplay(userProfile?.gender ?? ''),
                       Icons.person,
                     ),
                   _buildDetailItem(
@@ -633,7 +633,7 @@ class ProfileTab extends StatelessWidget {
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: userProfile!.interests.map<Widget>((interest) {
+                    children: (userProfile?.interests ?? []).map<Widget>((interest) {
                       return Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
@@ -823,25 +823,25 @@ class ProfileTab extends StatelessWidget {
       if (userProfile?.activityLevel != null)
         _buildDetailItem(
           'Activity Level',
-          _getActivityLevelDisplay(userProfile!.activityLevel!),
+          _getActivityLevelDisplay(userProfile?.activityLevel ?? ''),
           Icons.trending_up,
         ),
       if (userProfile?.workoutFrequency != null)
         _buildDetailItem(
           'Workout Frequency',
-          '${userProfile!.workoutFrequency} times/week',
+          '${userProfile?.workoutFrequency ?? 0} times/week',
           Icons.schedule,
         ),
       if (userProfile?.preferredWorkoutTime != null)
         _buildDetailItem(
           'Preferred Time',
-          _getWorkoutTimeDisplay(userProfile!.preferredWorkoutTime!),
+          _getWorkoutTimeDisplay(userProfile?.preferredWorkoutTime ?? ''),
           Icons.access_time,
         ),
-      if (userProfile?.gymMembership != null && userProfile!.gymMembership!.isNotEmpty)
+      if (userProfile?.gymMembership != null && (userProfile?.gymMembership?.isNotEmpty ?? false))
         _buildDetailItem(
           'Gym',
-          userProfile!.gymMembership!,
+          userProfile?.gymMembership ?? '',
           Icons.fitness_center,
         ),
       if (userProfile?.fitnessGoals?.isNotEmpty ?? false)
@@ -873,7 +873,7 @@ class ProfileTab extends StatelessWidget {
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
-                children: userProfile!.fitnessGoals!.map<Widget>((goal) {
+                children: (userProfile?.fitnessGoals ?? []).map<Widget>((goal) {
                   return Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
@@ -924,7 +924,7 @@ class ProfileTab extends StatelessWidget {
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
-                children: userProfile!.favoriteActivities!.map<Widget>((activity) {
+                children: (userProfile?.favoriteActivities ?? []).map<Widget>((activity) {
                   return Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(

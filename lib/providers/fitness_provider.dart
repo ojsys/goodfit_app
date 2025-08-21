@@ -88,6 +88,7 @@ class FitnessProvider with ChangeNotifier {
     double? startLongitude,
     double? endLatitude,
     double? endLongitude,
+    List<int> linkedGoalIds = const [],
   }) async {
     _setError(null);
     
@@ -124,6 +125,7 @@ class FitnessProvider with ChangeNotifier {
       startLongitude: startLongitude,
       endLatitude: endLatitude,
       endLongitude: endLongitude,
+      linkedGoalIds: linkedGoalIds,
     );
 
     try {

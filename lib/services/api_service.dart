@@ -10,7 +10,12 @@ import '../models/fitness_activity.dart';
 import '../utils/logger.dart';
 
 class ApiService {
-  static const String _baseUrl = 'http://127.0.0.1:8001/api/v1';
+  // Environment configuration
+  static const bool _isProduction = bool.fromEnvironment('dart.vm.product');
+  static const String _devBaseUrl = 'http://127.0.0.1:8001/api/v1';
+  static const String _prodBaseUrl = 'http://194.195.86.92/api/v1';
+  
+  static String get _baseUrl => _isProduction ? _prodBaseUrl : _devBaseUrl;
   static const String _tokenKey = 'auth_token';
   
   String? _authToken;
@@ -25,6 +30,9 @@ class ApiService {
   }
 
   Future<void> init() async {
+    AppLogger.info('ApiService initializing - Environment: ${_isProduction ? "PRODUCTION" : "DEVELOPMENT"}', 'ApiService');
+    AppLogger.info('Base URL: $_baseUrl', 'ApiService');
+    
     final prefs = await SharedPreferences.getInstance();
     _authToken = prefs.getString(_tokenKey);
     if (_authToken != null) {
@@ -1400,6 +1408,50 @@ class ApiService {
       }
     } catch (e) {
       AppLogger.error('Error creating goal', 'ApiService', e);
+      return ApiResponse.error('Network error: $e');
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> updateGoal(int goalId, Map<String, dynamic> goalData) async {
+    try {
+      AppLogger.info('Updating goal $goalId with Bearer format (APIToken)', 'ApiService');
+      
+      final response = await _client.put(
+        Uri.parse('$_baseUrl/fitness/goals/$goalId/'),
+        headers: _getHeaders(),
+        body: jsonEncode(goalData),
+      );
+      AppLogger.network('/fitness/goals/$goalId/', response.statusCode, 'UPDATE');
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        AppLogger.info('Goal $goalId updated successfully on server', 'ApiService');
+        return ApiResponse.success(data);
+      } else if (response.statusCode == 401) {
+        AppLogger.warning('Unauthorized goal update attempt', 'ApiService');
+        return ApiResponse.error('Authentication required');
+      } else if (response.statusCode == 404) {
+        AppLogger.warning('Goal $goalId not found for update', 'ApiService');
+        return ApiResponse.error('Goal not found');
+      } else if (response.statusCode == 400) {
+        // Get detailed validation errors
+        try {
+          final data = jsonDecode(response.body);
+          AppLogger.warning('Goal update 400 response: $data', 'ApiService');
+          final errorMessage = data['message'] ?? data['error'] ?? data['detail'] ?? 'Invalid goal data';
+          AppLogger.warning('Goal update validation error: $errorMessage', 'ApiService');
+          return ApiResponse.error(errorMessage);
+        } catch (e) {
+          AppLogger.warning('Goal update failed with 400 but no parseable error: ${response.body}', 'ApiService');
+          return ApiResponse.error('Invalid goal data');
+        }
+      } else {
+        AppLogger.warning('Goal update failed with status ${response.statusCode}', 'ApiService');
+        AppLogger.info('Response body: ${response.body}', 'ApiService');
+        return ApiResponse.error('Failed to update goal (${response.statusCode})');
+      }
+    } catch (e) {
+      AppLogger.error('Error updating goal', 'ApiService', e);
       return ApiResponse.error('Network error: $e');
     }
   }

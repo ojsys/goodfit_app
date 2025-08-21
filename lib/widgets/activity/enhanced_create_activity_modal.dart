@@ -3,6 +3,9 @@ import 'package:provider/provider.dart';
 import 'package:location/location.dart';
 import 'package:geocoding/geocoding.dart' as geo;
 import '../../providers/fitness_provider.dart';
+import '../../providers/goals_provider.dart';
+import '../../models/fitness_goal.dart';
+import '../../models/fitness_activity.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/distance_calculator.dart';
 import '../../utils/logger.dart';
@@ -33,6 +36,11 @@ class _EnhancedCreateActivityModalState extends State<EnhancedCreateActivityModa
   double? _distance;
   int _estimatedDuration = 30;
   String _activityName = '';
+  
+  // Goal linking
+  List<FitnessGoal> _compatibleGoals = [];
+  List<int> _selectedGoalIds = [];
+  bool _showGoalSelection = false;
   
   final Location _location = Location();
   bool _isLoadingLocation = false;
@@ -92,7 +100,7 @@ class _EnhancedCreateActivityModalState extends State<EnhancedCreateActivityModa
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this); // Updated to 3 tabs for goal selection
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 600),
       vsync: this,
@@ -106,6 +114,16 @@ class _EnhancedCreateActivityModalState extends State<EnhancedCreateActivityModa
     ));
     
     _animationController.forward();
+    
+    // Ensure goals are loaded
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final goalsProvider = Provider.of<GoalsProvider>(context, listen: false);
+      if (goalsProvider.goals.isEmpty && !goalsProvider.isLoading) {
+        AppLogger.info('Goals not loaded, loading now...', 'CreateActivity');
+        goalsProvider.loadGoals();
+      }
+      _loadCompatibleGoals();
+    });
   }
 
   @override
@@ -114,6 +132,51 @@ class _EnhancedCreateActivityModalState extends State<EnhancedCreateActivityModa
     _animationController.dispose();
     _pageController.dispose();
     super.dispose();
+  }
+
+  void _loadCompatibleGoals() {
+    final goalsProvider = Provider.of<GoalsProvider>(context, listen: false);
+    
+    // Log all available goals first
+    AppLogger.info('Total goals available: ${goalsProvider.goals.length}', 'CreateActivity');
+    AppLogger.info('Active goals: ${goalsProvider.activeGoals.length}', 'CreateActivity');
+    
+    for (final goal in goalsProvider.goals) {
+      AppLogger.info('Goal: ${goal.title} (Type: ${goal.goalType}, Active: ${goal.isActive}, Completed: ${goal.isCompleted}, ActivityType: ${goal.activityType})', 'CreateActivity');
+    }
+    
+    _compatibleGoals = goalsProvider.getCompatibleGoals(_selectedActivityType);
+    
+    // Log compatible goals found
+    AppLogger.info('Found ${_compatibleGoals.length} compatible goals for $_selectedActivityType', 'CreateActivity');
+    for (final goal in _compatibleGoals) {
+      AppLogger.info('- ${goal.title} (${goal.goalType}): ${goal.progressDisplay}', 'CreateActivity');
+    }
+    
+    // Force a rebuild to show the goals
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _onActivityTypeChanged(String newActivityType) {
+    setState(() {
+      _selectedActivityType = newActivityType;
+      _selectedGoalIds.clear(); // Clear previous selections
+      _loadCompatibleGoals(); // Reload compatible goals
+    });
+  }
+
+  void _toggleGoalSelection(int goalId) {
+    setState(() {
+      if (_selectedGoalIds.contains(goalId)) {
+        _selectedGoalIds.remove(goalId);
+      } else {
+        _selectedGoalIds.add(goalId);
+      }
+    });
+    
+    AppLogger.info('Selected goals: $_selectedGoalIds', 'CreateActivity');
   }
 
   @override
@@ -227,6 +290,7 @@ class _EnhancedCreateActivityModalState extends State<EnhancedCreateActivityModa
       controller: _pageController,
       children: [
         _buildActivityTypeSelection(),
+        _buildGoalSelection(),
         _buildActivityDetails(),
       ],
     );
@@ -256,7 +320,7 @@ class _EnhancedCreateActivityModalState extends State<EnhancedCreateActivityModa
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  'Step 1 of 2',
+                  'Step 1 of 3',
                   style: TextStyle(
                     color: AppTheme.primaryColor,
                     fontSize: 12,
@@ -281,9 +345,7 @@ class _EnhancedCreateActivityModalState extends State<EnhancedCreateActivityModa
                 final isSelected = _selectedActivityType == activity['name'];
                 
                 return GestureDetector(
-                  onTap: () {
-                    setState(() => _selectedActivityType = activity['name']);
-                  },
+                  onTap: () => _onActivityTypeChanged(activity['name']),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     decoration: BoxDecoration(
@@ -384,7 +446,7 @@ class _EnhancedCreateActivityModalState extends State<EnhancedCreateActivityModa
                 icon: const Icon(Icons.arrow_back),
               ),
               Text(
-                'Activity Details',
+                'Activity Details & Tracking',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -399,7 +461,7 @@ class _EnhancedCreateActivityModalState extends State<EnhancedCreateActivityModa
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  'Step 2 of 2',
+                  'Step 3 of 3',
                   style: TextStyle(
                     color: AppTheme.primaryColor,
                     fontSize: 12,
@@ -762,6 +824,342 @@ class _EnhancedCreateActivityModalState extends State<EnhancedCreateActivityModa
     );
   }
 
+  Widget _buildGoalSelection() {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                onPressed: () => _pageController.previousPage(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                ),
+                icon: const Icon(Icons.arrow_back),
+              ),
+              Text(
+                'Link to Goals',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  'Step 2 of 3',
+                  style: TextStyle(
+                    color: AppTheme.primaryColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Select goals to track with this activity',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Consumer<GoalsProvider>(
+            builder: (context, goalsProvider, child) {
+              // Update compatible goals when provider changes
+              _compatibleGoals = goalsProvider.getCompatibleGoals(_selectedActivityType);
+              
+              if (goalsProvider.isLoading) {
+                return const Expanded(
+                  child: Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+              }
+              
+              if (_compatibleGoals.isEmpty) {
+                return _buildNoCompatibleGoals();
+              }
+              
+              return Expanded(
+                child: ListView.builder(
+                  itemCount: _compatibleGoals.length,
+                  itemBuilder: (context, index) {
+                  final goal = _compatibleGoals[index];
+                  final isSelected = _selectedGoalIds.contains(goal.id);
+                  
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: Material(
+                      elevation: isSelected ? 4 : 1,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        onTap: () => _toggleGoalSelection(goal.id),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSelected 
+                                  ? AppTheme.primaryColor 
+                                  : Colors.grey.shade300,
+                              width: isSelected ? 2 : 1,
+                            ),
+                            color: isSelected 
+                                ? AppTheme.primaryColor.withValues(alpha: 0.05)
+                                : Colors.white,
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: _getGoalTypeColor(goal.goalType).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  _getGoalTypeIcon(goal.goalType),
+                                  color: _getGoalTypeColor(goal.goalType),
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      goal.title,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      goal.progressDisplay,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    LinearProgressIndicator(
+                                      value: goal.progressPercentage / 100,
+                                      backgroundColor: Colors.grey.shade200,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        _getGoalTypeColor(goal.goalType),
+                                      ),
+                                      minHeight: 4,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                child: Icon(
+                                  isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
+                                  color: isSelected ? AppTheme.primaryColor : Colors.grey.shade400,
+                                  size: 24,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                  },
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _pageController.previousPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text('Back'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton(
+                  onPressed: () => _pageController.nextPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      _selectedGoalIds.isEmpty ? 'Skip Goals' : 'Continue (${_selectedGoalIds.length})',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoCompatibleGoals() {
+    final goalsProvider = Provider.of<GoalsProvider>(context, listen: false);
+    final totalGoals = goalsProvider.goals.length;
+    final activeGoals = goalsProvider.goals.where((g) => g.isActive && !g.isCompleted).length;
+    
+    return Expanded(
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(50),
+              ),
+              child: Icon(
+                Icons.flag,
+                size: 48,
+                color: Colors.grey.shade400,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No Compatible Goals',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You don\'t have any active goals that are compatible with $_selectedActivityType activities.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    'Debug Info',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue.shade700,
+                    ),
+                  ),
+                  Text(
+                    'Total goals: $totalGoals\nActive goals: $activeGoals\nActivity: $_selectedActivityType',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.blue.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            OutlinedButton.icon(
+              onPressed: () {
+                // TODO: Navigate to create goal screen
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Goal creation will be available soon!'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Create New Goal'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _getGoalTypeColor(String goalType) {
+    switch (goalType.toLowerCase()) {
+      case 'distance':
+        return Colors.blue;
+      case 'duration':
+        return Colors.green;
+      case 'calories':
+        return Colors.orange;
+      case 'frequency':
+        return Colors.purple;
+      default:
+        return AppTheme.primaryColor;
+    }
+  }
+
+  IconData _getGoalTypeIcon(String goalType) {
+    switch (goalType.toLowerCase()) {
+      case 'distance':
+        return Icons.straighten;
+      case 'duration':
+        return Icons.timer;
+      case 'calories':
+        return Icons.local_fire_department;
+      case 'frequency':
+        return Icons.repeat;
+      default:
+        return Icons.flag;
+    }
+  }
+
   Widget _buildContinueButton() {
     return SizedBox(
       width: double.infinity,
@@ -795,27 +1193,53 @@ class _EnhancedCreateActivityModalState extends State<EnhancedCreateActivityModa
   Widget _buildCreateButton() {
     final isValid = _activityName.trim().isNotEmpty;
     
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: isValid ? _createActivity : null,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppTheme.primaryColor,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: isValid ? _startLiveTracking : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 2,
+            ),
+            icon: const Icon(Icons.play_arrow, size: 20),
+            label: const Text(
+              'Start Live Tracking',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
-          elevation: 2,
         ),
-        child: const Text(
-          'Create Activity',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: isValid ? _createActivityNow : null,
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            icon: const Icon(Icons.add, size: 20),
+            label: const Text(
+              'Create Activity Now',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 
@@ -858,7 +1282,45 @@ class _EnhancedCreateActivityModalState extends State<EnhancedCreateActivityModa
     }
   }
 
-  void _createActivity() async {
+  void _startLiveTracking() async {
+    if (_activityName.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter an activity name'),
+          backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    // Close modal and navigate to live tracking screen
+    Navigator.of(context).pop();
+    
+    // Navigate to live tracking screen with activity data
+    Navigator.of(context).pushNamed(
+      '/live-tracking',
+      arguments: {
+        'activityType': _selectedActivityType,
+        'activityName': _activityName,
+        'estimatedDuration': _estimatedDuration,
+        'startLocation': _startLocation,
+        'startLatitude': _startLatitude,
+        'startLongitude': _startLongitude,
+        'linkedGoalIds': _selectedGoalIds,
+      },
+    );
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Starting live tracking for "$_activityName"'),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _createActivityNow() async {
     if (_activityName.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -893,19 +1355,60 @@ class _EnhancedCreateActivityModalState extends State<EnhancedCreateActivityModa
       startLongitude: _startLongitude,
       endLatitude: _endLatitude,
       endLongitude: _endLongitude,
+      linkedGoalIds: _selectedGoalIds,
     );
     
     if (mounted) {
       Navigator.of(context).pop(); // Close loading dialog
       
       if (success) {
-        Navigator.of(context).pop(); // Close modal
+        // Update goal progress if goals are linked
+        if (_selectedGoalIds.isNotEmpty) {
+          final goalsProvider = Provider.of<GoalsProvider>(context, listen: false);
+          
+          // Create a temporary activity for progress calculation
+          final completedActivity = FitnessActivity(
+            id: 0,
+            activityType: _selectedActivityType,
+            name: _activityName,
+            durationMinutes: _estimatedDuration,
+            distanceKm: _distance,
+            caloriesBurned: _estimateCalories(),
+            startTime: DateTime.now(),
+            endTime: DateTime.now().add(Duration(minutes: _estimatedDuration)),
+            startLocation: _startLocation,
+            endLocation: _endLocation,
+            startLatitude: _startLatitude,
+            startLongitude: _startLongitude,
+            endLatitude: _endLatitude,
+            endLongitude: _endLongitude,
+            linkedGoalIds: _selectedGoalIds,
+            isCompleted: true,
+          );
+          
+          // Update goal progress
+          try {
+            await goalsProvider.updateGoalProgress(completedActivity);
+            AppLogger.info('Updated progress for ${_selectedGoalIds.length} linked goals', 'CreateActivity');
+          } catch (e) {
+            AppLogger.error('Failed to update goal progress: $e', 'CreateActivity');
+          }
+        }
+        
+        if (mounted) {
+          Navigator.of(context).pop(); // Close modal
+        }
         // Trigger a refresh of the fitness data
         await fitnessProvider.loadActivities();
+        
         if (mounted) {
+          final goalMessage = _selectedGoalIds.isNotEmpty 
+              ? ' and updated ${_selectedGoalIds.length} goal(s)!'
+              : '!';
+              
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Activity "$_activityName" created successfully!'),
+              content: Text('Activity "$_activityName" created successfully$goalMessage'),
               backgroundColor: Colors.green,
               behavior: SnackBarBehavior.floating,
             ),

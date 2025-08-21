@@ -21,6 +21,7 @@ import 'screens/onboarding/photo_upload_screen.dart';
 import 'screens/home/main_navigation_screen.dart';
 import 'screens/profile/edit_profile_screen.dart';
 import 'screens/map/workout_map_screen.dart';
+import 'screens/activity/live_tracking_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -78,6 +79,7 @@ class AGoodFitApp extends StatelessWidget {
           '/home': (context) => const MainNavigationScreen(),
           '/edit-profile': (context) => const EditProfileScreen(),
           '/map': (context) => const WorkoutMapScreen(),
+          '/live-tracking': (context) => const LiveTrackingScreen(),
         },
       ),
     );

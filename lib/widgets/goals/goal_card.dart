@@ -2,10 +2,114 @@ import 'package:flutter/material.dart';
 import '../../models/fitness_goal.dart';
 import '../../theme/app_theme.dart';
 
-class GoalCard extends StatelessWidget {
+class GoalCard extends StatefulWidget {
   final FitnessGoal goal;
+  final VoidCallback? onTap;
+  final bool showAnimation;
 
-  const GoalCard({super.key, required this.goal});
+  const GoalCard({
+    super.key, 
+    required this.goal,
+    this.onTap,
+    this.showAnimation = true,
+  });
+
+  @override
+  State<GoalCard> createState() => _GoalCardState();
+}
+
+class _GoalCardState extends State<GoalCard>
+    with TickerProviderStateMixin {
+  late AnimationController _progressAnimationController;
+  late AnimationController _pulseAnimationController;
+  late Animation<double> _progressAnimation;
+  late Animation<double> _pulseAnimation;
+  
+
+  @override
+  void initState() {
+    super.initState();
+    
+    _progressAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    
+    _pulseAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    
+    _progressAnimation = Tween<double>(
+      begin: 0.0,
+      end: widget.goal.progressPercentage / 100,
+    ).animate(CurvedAnimation(
+      parent: _progressAnimationController,
+      curve: Curves.easeOutCubic,
+    ));
+    
+    _pulseAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.05,
+    ).animate(CurvedAnimation(
+      parent: _pulseAnimationController,
+      curve: Curves.elasticOut,
+    ));
+    
+    
+    // Start initial animation
+    if (widget.showAnimation) {
+      _progressAnimationController.forward();
+    } else {
+      _progressAnimationController.value = 1.0;
+    }
+  }
+  
+  @override
+  void dispose() {
+    _progressAnimationController.dispose();
+    _pulseAnimationController.dispose();
+    super.dispose();
+  }
+  
+  @override
+  void didUpdateWidget(GoalCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    
+    // Check if progress has changed and animate if needed
+    if (oldWidget.goal.progressPercentage != widget.goal.progressPercentage) {
+      _animateProgressChange(
+        oldWidget.goal.progressPercentage,
+        widget.goal.progressPercentage,
+      );
+    }
+  }
+  
+  void _animateProgressChange(double oldProgress, double newProgress) {
+    if (!widget.showAnimation) return;
+    
+    // Update animation target
+    _progressAnimation = Tween<double>(
+      begin: oldProgress / 100,
+      end: newProgress / 100,
+    ).animate(CurvedAnimation(
+      parent: _progressAnimationController,
+      curve: Curves.easeOutCubic,
+    ));
+    
+    // Reset and play animation
+    _progressAnimationController.reset();
+    _progressAnimationController.forward();
+    
+    // Trigger pulse animation for significant progress
+    if (newProgress > oldProgress + 5) {
+      _pulseAnimationController.reset();
+      _pulseAnimationController.forward().then((_) {
+        _pulseAnimationController.reverse();
+      });
+    }
+    
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +162,7 @@ class GoalCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                goal.title,
+                widget.goal.title,
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -70,7 +174,7 @@ class GoalCard extends StatelessWidget {
             ],
           ),
         ),
-        if (goal.isCompleted)
+        if (widget.goal.isCompleted)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
@@ -103,7 +207,7 @@ class GoalCard extends StatelessWidget {
 
   Widget _buildDescription() {
     return Text(
-      goal.description,
+      widget.goal.description,
       style: TextStyle(
         fontSize: 14,
         color: Colors.grey.shade600,
@@ -114,7 +218,12 @@ class GoalCard extends StatelessWidget {
   }
 
   Widget _buildProgressBar() {
-    final progress = goal.progressPercentage / 100;
+    return AnimatedBuilder(
+      animation: widget.showAnimation ? _progressAnimation : Listenable.merge([]),
+      builder: (context, child) {
+        final progress = widget.showAnimation 
+            ? _progressAnimation.value 
+            : widget.goal.progressPercentage / 100;
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -130,24 +239,42 @@ class GoalCard extends StatelessWidget {
                 fontWeight: FontWeight.w500,
               ),
             ),
-            Text(
-              '${goal.progressPercentage.toInt()}%',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade600,
-                fontWeight: FontWeight.w500,
-              ),
+            AnimatedBuilder(
+              animation: widget.showAnimation ? _progressAnimation : Listenable.merge([]),
+              builder: (context, child) {
+                final displayPercentage = widget.showAnimation 
+                    ? (_progressAnimation.value * 100).toInt()
+                    : widget.goal.progressPercentage.toInt();
+                return Text(
+                  '$displayPercentage%',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                );
+              },
             ),
           ],
         ),
         const SizedBox(height: 8),
-        LinearProgressIndicator(
+        AnimatedBuilder(
+          animation: widget.showAnimation ? _pulseAnimation : Listenable.merge([]),
+          builder: (context, child) {
+            return Transform.scale(
+              scale: widget.showAnimation ? _pulseAnimation.value : 1.0,
+              child: LinearProgressIndicator(
           value: progress,
           backgroundColor: Colors.grey.shade200,
           valueColor: AlwaysStoppedAnimation<Color>(_getProgressColor()),
-          minHeight: 8,
+                minHeight: 8,
+              ),
+            );
+          },
         ),
-      ],
+          ],
+        );
+      },
     );
   }
 
@@ -157,21 +284,21 @@ class GoalCard extends StatelessWidget {
         Expanded(
           child: _buildProgressStat(
             label: 'Current',
-            value: _formatValue(goal.currentProgress),
+            value: _formatValue(widget.goal.currentProgress),
             icon: Icons.trending_up,
           ),
         ),
         Expanded(
           child: _buildProgressStat(
             label: 'Target',
-            value: _formatValue(goal.targetValue),
+            value: _formatValue(widget.goal.targetValue),
             icon: Icons.flag,
           ),
         ),
         Expanded(
           child: _buildProgressStat(
             label: 'Remaining',
-            value: _formatValue(goal.targetValue - goal.currentProgress),
+            value: _formatValue(widget.goal.targetValue - widget.goal.currentProgress),
             icon: Icons.schedule,
           ),
         ),
@@ -234,7 +361,7 @@ class GoalCard extends StatelessWidget {
               ),
             ),
           ),
-          if (goal.daysRemaining > 0 && !goal.isCompleted)
+          if (widget.goal.daysRemaining > 0 && !widget.goal.isCompleted)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
@@ -242,7 +369,7 @@ class GoalCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                '${goal.daysRemaining} days left',
+                '${widget.goal.daysRemaining} days left',
                 style: TextStyle(
                   fontSize: 12,
                   color: _getDaysRemainingColor(),
@@ -259,10 +386,10 @@ class GoalCard extends StatelessWidget {
     String status;
     Color color;
     
-    if (goal.isCompleted) {
+    if (widget.goal.isCompleted) {
       status = 'Completed';
       color = Colors.green;
-    } else if (goal.isActive) {
+    } else if (widget.goal.isActive) {
       status = 'Active';
       color = AppTheme.primaryColor;
     } else {
@@ -288,7 +415,7 @@ class GoalCard extends StatelessWidget {
   }
 
   IconData _getGoalTypeIcon() {
-    switch (goal.goalType.toLowerCase()) {
+    switch (widget.goal.goalType.toLowerCase()) {
       case 'distance':
         return Icons.straighten;
       case 'duration':
@@ -303,7 +430,7 @@ class GoalCard extends StatelessWidget {
   }
 
   Color _getGoalTypeColor() {
-    switch (goal.goalType.toLowerCase()) {
+    switch (widget.goal.goalType.toLowerCase()) {
       case 'distance':
         return Colors.blue;
       case 'duration':
@@ -318,43 +445,43 @@ class GoalCard extends StatelessWidget {
   }
 
   Color _getProgressColor() {
-    if (goal.isCompleted) return Colors.green;
+    if (widget.goal.isCompleted) return Colors.green;
     
-    final progress = goal.progressPercentage;
+    final progress = widget.goal.progressPercentage;
     if (progress >= 80) return Colors.green;
     if (progress >= 50) return Colors.orange;
     return Colors.red;
   }
 
   Color _getDaysRemainingColor() {
-    final days = goal.daysRemaining;
+    final days = widget.goal.daysRemaining;
     if (days <= 3) return Colors.red;
     if (days <= 7) return Colors.orange;
     return Colors.green;
   }
 
   String _formatValue(double value) {
-    switch (goal.goalType.toLowerCase()) {
+    switch (widget.goal.goalType.toLowerCase()) {
       case 'distance':
-        return '${value.toStringAsFixed(1)} ${goal.unit}';
+        return '${value.toStringAsFixed(1)} ${widget.goal.unit}';
       case 'duration':
-        return '${value.toInt()} ${goal.unit}';
+        return '${value.toInt()} ${widget.goal.unit}';
       case 'calories':
-        return '${value.toInt()} ${goal.unit}';
+        return '${value.toInt()} ${widget.goal.unit}';
       case 'frequency':
-        return '${value.toInt()} ${goal.unit}';
+        return '${value.toInt()} ${widget.goal.unit}';
       default:
-        return '${value.toStringAsFixed(1)} ${goal.unit}';
+        return '${value.toStringAsFixed(1)} ${widget.goal.unit}';
     }
   }
 
   String _getTimeInfoText() {
-    final startDate = goal.startDate;
-    final endDate = goal.endDate;
+    final startDate = widget.goal.startDate;
+    final endDate = widget.goal.endDate;
     final now = DateTime.now();
     
-    if (goal.isCompleted && goal.completedDate != null) {
-      return 'Completed on ${_formatDate(goal.completedDate!)}';
+    if (widget.goal.isCompleted && widget.goal.completedDate != null) {
+      return 'Completed on ${_formatDate(widget.goal.completedDate!)}';
     }
     
     if (now.isBefore(startDate)) {
