@@ -8,7 +8,7 @@ plugins {
 android {
     namespace = "com.example.goodfit_app"
     compileSdk = flutter.compileSdkVersion
-    // ndkVersion = flutter.ndkVersion // Removed to avoid NDK issues
+    ndkVersion = "26.3.11579264" // Use working NDK version
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
